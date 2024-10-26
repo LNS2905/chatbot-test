@@ -46,7 +46,11 @@
 </template>
 
 <script>
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GoogleGenerativeAI,
+  HarmBlockThreshold,
+  HarmCategory,
+} from "@google/generative-ai";
 import axios from "axios";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -61,21 +65,21 @@ export default {
       model: null,
       chat: null,
       systemPrompt: `Bạn là một trợ lý AI chuyên nghiệp, làm việc cho website bán vé xem phim Ticketo.
-Hãy phân tích ý định của người dùng từ tin nhắn sau và trả về kết quả theo format [ý định], [thông tin bổ sung]:
+Hãy phân tích ý định của tôi từ tin nhắn sau và trả về kết quả theo format [ý định], [thông tin bổ sung]:
 
-Tin nhắn của người dùng: {userMessage}
+Tin nhắn của tôi: {userMessage}
 
 Các ý định có thể có:
-- tim_phim: Người dùng muốn tìm kiếm thông tin về một bộ phim cụ thể. Thông tin bổ sung: Tên phim.
-- goi_y_phim: Người dùng muốn được gợi ý phim.
-- hoi_dap: Người dùng muốn hỏi đáp về các vấn đề khác (ví dụ: chính sách, thanh toán, etc.).
+- tim_phim: Tôi muốn tìm kiếm thông tin về một bộ phim cụ thể. Thông tin bổ sung: Tên phim.
+- goi_y_phim: Tôi muốn được gợi ý phim.
+- hoi_dap: Tôi muốn hỏi đáp về các vấn đề khác (ví dụ: chính sách, thanh toán, etc.).
 
 Ví dụ:
-- Tin nhắn của người dùng: "Bạn có thể cho tôi biết thông tin về phim Lật Mặt 6?" -> Kết quả: tim_phim, Lật Mặt 6
-- Tin nhắn của người dùng: "Bạn có gợi ý phim nào hay không?" -> Kết quả: goi_y_phim,
-- Tin nhắn của người dùng: "Làm thế nào để đặt vé online?" -> Kết quả: hoi_dap,
+- Tin nhắn của tôi: "Bạn có thể cho tôi biết thông tin về phim Lật Mặt 6?" -> Kết quả: tim_phim, Lật Mặt 6
+- Tin nhắn của tôi: "Bạn có gợi ý phim nào hay không?" -> Kết quả: goi_y_phim,
+- Tin nhắn của tôi: "Làm thế nào để đặt vé online?" -> Kết quả: hoi_dap,
 `,
-      tmdbApiKey: "28859d876d66d7d344a5e1652b06949c",
+      tmdbApiKey: import.meta.env.VITE_TMDB_API_KEY,
     };
   },
   async created() {
@@ -85,9 +89,31 @@ Ví dụ:
     async initializeChat() {
       try {
         const genAI = new GoogleGenerativeAI(
-          import.meta.env.VITE_GEMINI_API_KEY
+          import.meta.env.VITE_GEMINI_API_KEY3
         );
-        this.model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        const safetySettings = [
+          {
+            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+          {
+            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            threshold: HarmBlockThreshold.BLOCK_NONE,
+          },
+        ];
+
+        this.model = genAI.getGenerativeModel({
+          model: "gemini-1.5-pro",
+          safetySettings,
+        });
 
         // Khởi tạo chat với system prompt
         this.chat = this.model.startChat({
@@ -98,8 +124,8 @@ Ví dụ:
             },
           ],
           generationConfig: {
-            maxOutputTokens: 5000,
-            temperature: 0.5,
+            maxOutputTokens: 100000,
+            temperature: 1,
             topP: 0.1,
             topK: 16,
           },
@@ -194,6 +220,8 @@ Ví dụ:
           analysisResponse.candidates[0].content.parts[0].text
         );
 
+        console.log("Phân tích:", intent, additionalInfo);
+
         if (intent === "[tim_phim]") {
           const movieInfo = await this.getMovieInfo(additionalInfo);
           if (movieInfo) {
@@ -237,11 +265,12 @@ Ví dụ:
 
           if (movieSuggestions) {
             // Tạo prompt cho Gemini
-            let prompt = "Dưới đây là một số phim hay bạn có thể thích:\n\n";
+            let prompt =
+              "Dưới đây là một số phim hay bạn có thể gợi ý cho tôi, sau khi xem qua thì hãy tìm phim phù hợp cho tôi :\n\n";
             movieSuggestions.forEach((movie) => {
               prompt += `**${movie.title}** (*${
                 movie.releaseDate
-              }*) - ${movie.overview.slice(0, 100)}...\n`; //Giới thiệu ngắn gọn
+              }*) - ${movie.overview.slice(0, 1000)}...\n`;
             });
 
             const result = await this.chat.sendMessage(prompt);
