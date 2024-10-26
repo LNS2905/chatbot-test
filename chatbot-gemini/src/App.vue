@@ -194,7 +194,7 @@ Ví dụ:
           analysisResponse.candidates[0].content.parts[0].text
         );
 
-        if (intent === "tim_phim") {
+        if (intent === "[tim_phim]") {
           const movieInfo = await this.getMovieInfo(additionalInfo);
           if (movieInfo) {
             this.addMessage({
@@ -232,7 +232,7 @@ Ví dụ:
               timestamp: new Date(),
             });
           }
-        } else if (intent === "goi_y_phim") {
+        } else if (intent === "[goi_y_phim]") {
           const movieSuggestions = await this.getMovieSuggestions();
 
           if (movieSuggestions) {
@@ -264,7 +264,7 @@ Ví dụ:
               timestamp: new Date(),
             });
           }
-        } else if (intent === "hoi_dap") {
+        } else if (intent === "[hoi_dap]") {
           // Xử lý câu hỏi thông thường
           const result = await this.chat.sendMessage(userMessage);
           const response = await result.response;
